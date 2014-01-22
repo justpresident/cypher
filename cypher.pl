@@ -20,9 +20,7 @@ and exit 0;
 my $term = Term::ReadLine->new('Cypher')
 or croak "Term Readline error";
 
-my $key = $term->readline("Enter Password for $filename: ");
-
-$key .= '~' x (32 - length($key));
+my $key = read_password($term);
 
 my $cypher = Crypt::Rijndael->new( $key, Crypt::Rijndael::MODE_CBC() );
 
@@ -46,6 +44,9 @@ while(1) {
 		else { say "No such command '$cmd'\n" }
 	}
 }
+
+exit 0;
+
 
 sub dump_all {
 	print Dumper($data);	
@@ -149,7 +150,7 @@ sub decrypt {
 	(my $pad_length,$data) = split(/-/,$data,2);
 
 	$data = $cypher->decrypt($data);
-	$data = substr($data,0,-1*$pad_length);
+	$data = substr($data, 0, -1*$pad_length);
 
 	return $data;
 }
@@ -158,5 +159,21 @@ sub usage {
 	say "
 	USAGE: $0 file_name
 	";
+}
+
+sub read_password {
+	my $term = shift;
+
+	my $term_attribs = $term->Attribs;
+	$term_attribs->{redisplay_function} = $term_attribs->{shadow_redisplay};
+
+	my $key = $term->readline("Enter Password for $filename: ");
+
+	$term->remove_history($term->where_history);
+	$term_attribs->{redisplay_function} = undef;
+
+	$key .= '~' x (32 - length($key));
+
+	return $key;
 }
 
