@@ -30,8 +30,7 @@ while(1) {
 	my $line = $term->readline('cypher > ');
 	last if !defined $line;
 
-	$line =~ s/^\s+//;
-	$line =~ s/\s+$//;
+	$line = trim($line);
 	next unless $line;
 
 	my ($cmd,@args) = split(/\s+/,$line);
@@ -40,6 +39,7 @@ while(1) {
 		case "search" { search(@args) }
 		case "get" { get(@args) }
 		case "put" { put(@args) }
+		case "del" { del(@args)}
 		case "dump" { dump_all(@args) }
 		else { say "No such command '$cmd'\n" }
 	}
@@ -62,6 +62,7 @@ sub put {
 	}
 
 	$data->{$key} = $val;
+	say "$key stored";
 
 	store_data($cypher, $data, $filename);
 }
@@ -73,7 +74,21 @@ sub get {
 	if ($val) {
 		say "$key: $val";
 	} else {
-		say "No such key found";
+		say "No such key '$key' found";
+	}
+}
+
+sub del {
+	my $key = shift;
+
+	my $val = $data->{$key};
+	if ($data->{$key}) {
+		delete $data->{$key};
+		say "$key: $val deleted";
+
+		store_data($cypher, $data, $filename);
+	} else {
+		say "No such key '$key' found";
 	}
 }
 
@@ -174,6 +189,63 @@ sub read_password {
 
 	$key .= '~' x (32 - length($key));
 
+	$term_attribs->{completion_function} = \&autocomplete;
+
 	return $key;
+}
+
+##############################
+
+sub autocomplete {	
+	my $text = shift;
+	my $line = shift;
+	my $start = shift;
+	my $end = shift;
+
+	$line = trim($line);
+
+	my ($cmd,@args) = split(/\s+/, $line);
+	$cmd ||= '';
+	push @args, $text if $text eq '';
+
+#	print "ac: $text,$line\t$cmd,'".scalar(@args)."'\n";
+
+	if (@args) {
+		if ($cmd =~ /^(search|get|del)$/) {
+			return undef if @args > 1;
+			return $term->completion_matches($text,\&keyword);
+		}
+	} else {
+			my @all_commands = qw(put get search del dump);
+			return grep { /^\Q$text/ } (sort @all_commands);
+	}
+
+	return undef;
+}
+
+{
+	my @words = ();
+	my $i;
+	sub keyword {
+		my ($text, $state) = @_;
+
+#		return unless $text;
+		if($state) {
+			$i++;
+		} else { # first call
+			$i = 0;
+			@words = sort keys %$data;
+		}
+		for (; $i < scalar(@words); $i++) {
+			return $words[$i] if $words[$i] =~ /^\Q$text/;
+		};
+		return undef;
+	}
+};
+
+sub trim {
+	my $s = shift;
+	$s =~ s/^\s+|\s+$//g;
+	return $s;
 }
 
