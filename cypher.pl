@@ -95,7 +95,7 @@ sub del {
 sub search {
 	my $re = shift || '';
 
-	my @keys = grep{$_ =~ /$re/}(keys %$data);
+	my @keys = grep{$_ =~ /$re/}(sort keys %$data);
 
 	say join("\n", @keys);
 }
@@ -211,7 +211,7 @@ sub autocomplete {
 #	print "ac: $text,$line\t$cmd,'".scalar(@args)."'\n";
 
 	if (@args) {
-		if ($cmd =~ /^(search|get|del)$/) {
+		if ($cmd =~ /^(search|get|del|put)$/) {
 			return undef if @args > 1;
 			return $term->completion_matches($text,\&keyword);
 		}
