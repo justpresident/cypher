@@ -41,18 +41,35 @@ while(1) {
 		case "put" { put(@args) }
 		case "del" { del(@args)}
 		case "dump" { dump_vals(@args) }
+		case "help" {help(@args)}
 		else { say "No such command '$cmd'\n" }
 	}
 }
 
 exit 0;
 
+########## Command line functions ###########################
+
+sub help {
+	say "available commands: ";
+	say "\t put KEY VAL";
+	say "\t\t puts pair KEY:VAL into storage";
+	say "\t get KEY";
+	say "\t\t gets and shows stored value for key KEY";
+	say "\t search MASK";
+	say "\t\t searches and shows all keys, containing MASK as substring";
+	say "\t del KEY";
+	say "\t\t deletes key KEY from storage";
+	say "\t dump REGEXP";
+	say "\t\t dumps all data for keys matching perl regexp /^REGEXP\$/";
+	say "\n You can use <TAB> for autocompletion for commands and data keys";
+}
 
 sub dump_vals {
 	my $re = shift;
 
 	unless($re) {
-		say "syntax: dump REGEX";
+		say "syntax: dump REGEXP";
 		return;
 	}
 	
@@ -114,6 +131,8 @@ sub search {
 sub not_impl {
 	say "not implemented\n";
 }
+
+########### Data I/O functions ##############################
 
 sub load_data {
 	my $cypher = shift;
@@ -205,7 +224,7 @@ sub read_password {
 	return $key;
 }
 
-##############################
+############# Auto completion ###############################
 
 sub autocomplete {	
 	my $text = shift;
@@ -227,7 +246,7 @@ sub autocomplete {
 			return $term->completion_matches($text,\&keyword);
 		}
 	} else {
-			my @all_commands = qw(put get search del dump);
+			my @all_commands = qw(put get search del dump help);
 			return grep { /^\Q$text/ } (sort @all_commands);
 	}
 
