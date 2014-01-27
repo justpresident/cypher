@@ -40,7 +40,7 @@ while(1) {
 		case "get" { get(@args) }
 		case "put" { put(@args) }
 		case "del" { del(@args)}
-		case "dump" { dump_all(@args) }
+		case "dump" { dump_vals(@args) }
 		else { say "No such command '$cmd'\n" }
 	}
 }
@@ -48,8 +48,19 @@ while(1) {
 exit 0;
 
 
-sub dump_all {
-	print Dumper($data);	
+sub dump_vals {
+	my $re = shift;
+
+	unless($re) {
+		say "syntax: dump REGEX";
+		return;
+	}
+	
+	my @keys = grep{$_ =~ /^$re$/}(sort keys %$data);
+
+	foreach my $key(@keys) {
+		say "$key: ".$data->{$key};
+	}
 }
 
 sub put {
