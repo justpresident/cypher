@@ -15,27 +15,20 @@ use Term::ReadLine;
 use Getopt::Long;
 use Pod::Usage;
 
-my $encrypt = 0;
-my $decrypt = 0;
-
-my $opts = GetOptions(
-	'encrypt|enc|e' => \$encrypt,
-	'decrypt' => \$decrypt,
-	'help' => sub {pod2usage(-verbose => 2)},
-);
-
-print Dumper $opts;
-
-my $filename = shift
-or pod2usage()
-and exit 0;
-
 my $term = Term::ReadLine->new('Cypher')
 or croak "Term Readline error";
 
-my $key = read_password($term);
 
-my $cypher = Crypt::Rijndael->new( $key, Crypt::Rijndael::MODE_CBC() );
+my $opts = GetOptions(
+	'encrypt|enc|e' => sub {enc_cmd(\&encrypt)},
+	'decrypt' => sub {enc_cmd(\&decrypt)},
+	'help' => sub {pod2usage(-verbose => 2)},
+) or pod2usage();
+
+my $filename = shift
+or pod2usage();
+
+my $cypher = mk_cypher($term, $filename);
 
 my $data = load_data($cypher, $filename);
 
@@ -61,7 +54,7 @@ while(1) {
 
 exit 0;
 
-########## Command line functions ###########################
+########## Data Storage functions #########################
 
 sub dump_vals {
 	my $re = shift;
@@ -126,69 +119,36 @@ sub search {
 	say join("\n", @keys);
 }
 
-sub not_impl {
-	say "not implemented\n";
-}
+########### Encrypter functions #############################
 
-########### Data I/O functions ##############################
-
-sub load_data {
-	my $cypher = shift;
+sub mk_cypher {
+	my $term = shift;
 	my $filename = shift;
 
-	unless(-f $filename) {
-		return {};
-	}
+	my $key = read_password($term, $filename);
+
+	my $cypher = Crypt::Rijndael->new( $key, Crypt::Rijndael::MODE_CBC() );
+
+	return $cypher;
+}
+
+sub enc_cmd {
+	my $func = shift;
+
+	my $filename = shift @ARGV;
+
+	defined $filename && -f $filename
+	or pod2usage(-verbose => 99, -sections=>["SYNOPSIS", "ARGUMENTS"]);
 
 	my $data = read_file($filename);
 
-	$data = decrypt($cypher,$data);
+	my $cypher = mk_cypher($term, $filename);
+	$data = &$func($cypher, $data);
 
-	return thaw($data);
-}
+	binmode(STDOUT);
+	print $data;
 
-sub read_file {
-	my $filename = shift;
-
-	open(my $file, "<$filename");
-	binmode($file);
-
-	my $fsize = -s $filename;
-	my $data = '';
-
-	my $bytes_read = sysread($file, $data, $fsize) || 0;
-	
-	$bytes_read == $fsize
-	or croak("Can't load $file: $!");
-
-	close($file);
-
-	return $data;
-}
-
-sub store_data {
-	my $cypher = shift;
-	my $data = shift;
-	my $filename = shift;
-
-	my $ice = encrypt($cypher,freeze($data));
-
-	write_file($ice,$filename);
-
-	return 1;
-}
-
-sub write_file {
-	my $data = shift;
-	my $filename = shift;
-
-	open(my $file, ">$filename");
-	binmode($file);
-
-	syswrite($file, $data)
-	or croak("Write $file failed: $!");
-
-	close($file);
+	exit(0);
 }
 
 sub encrypt {
@@ -216,6 +176,7 @@ sub decrypt {
 
 sub read_password {
 	my $term = shift;
+	my $filename = shift;
 
 	my $term_attribs = $term->Attribs;
 	$term_attribs->{redisplay_function} = $term_attribs->{shadow_redisplay};
@@ -230,6 +191,67 @@ sub read_password {
 	$term_attribs->{completion_function} = \&autocomplete;
 
 	return $key;
+}
+
+########### Data I/O functions ##############################
+
+sub load_data {
+	my $cypher = shift;
+	my $filename = shift;
+
+	unless(-f $filename) {
+		return {};
+	}
+
+	my $data = read_file($filename);
+
+	$data = decrypt($cypher,$data);
+
+	return thaw($data);
+}
+
+sub store_data {
+	my $cypher = shift;
+	my $data = shift;
+	my $filename = shift;
+
+	my $ice = encrypt($cypher,freeze($data));
+
+	write_file($ice,$filename);
+
+	return 1;
+}
+
+sub read_file {
+	my $filename = shift;
+
+	open(my $file, "<$filename");
+	binmode($file);
+
+	my $fsize = -s $filename;
+	my $data = '';
+
+	my $bytes_read = sysread($file, $data, $fsize) || 0;
+	
+	$bytes_read == $fsize
+	or croak("Can't load $file: $!");
+
+	close($file);
+
+	return $data;
+}
+
+sub write_file {
+	my $data = shift;
+	my $filename = shift;
+
+	open(my $file, ">$filename");
+	binmode($file);
+
+	syswrite($file, $data)
+	or croak("Write $file failed: $!");
+
+	close($file);
 }
 
 ############# Auto completion ###############################
@@ -307,7 +329,7 @@ By default goes into Secure Storage Mode - loads encrypted file and provides int
 
 =back
 
-=head1 AGRUMENTS
+=head1 ARGUMENTS
 
 =over
 
