@@ -33,7 +33,7 @@ while(1) {
 	$line = trim($line);
 	next unless $line;
 
-	my ($cmd,@args) = split(/\s+/,$line);
+	my ($cmd,@args) = split(/\s+/,$line,3);
 
 	switch($cmd) {
 		case "search" { search(@args) }
@@ -142,6 +142,16 @@ sub load_data {
 		return {};
 	}
 
+	my $data = read_file($filename);
+
+	$data = decrypt($cypher,$data);
+
+	return thaw($data);
+}
+
+sub read_file {
+	my $filename = shift;
+
 	open(my $file, "<$filename");
 	binmode($file);
 
@@ -155,9 +165,7 @@ sub load_data {
 
 	close($file);
 
-	$data = decrypt($cypher,$data);
-
-	return thaw($data);
+	return $data;
 }
 
 sub store_data {
@@ -165,17 +173,25 @@ sub store_data {
 	my $data = shift;
 	my $filename = shift;
 
-	open(my $file, ">$filename");
-	binmode($file);
 
 	my $ice = encrypt($cypher,freeze($data));
 
-	syswrite($file, $ice)
+	write_file($ice,$filename);
+
+	return 1;
+}
+
+sub write_file {
+	my $data = shift;
+	my $filename = shift;
+
+	open(my $file, ">$filename");
+	binmode($file);
+
+	syswrite($file, $data)
 	or croak("Write $file failed: $!");
 
 	close($file);
-
-	return 1;
 }
 
 sub encrypt {
