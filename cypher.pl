@@ -12,9 +12,22 @@ use Switch;
 use Carp;
 use Crypt::Rijndael;
 use Term::ReadLine;
+use Getopt::Long;
+use Pod::Usage;
+
+my $encrypt = 0;
+my $decrypt = 0;
+
+my $opts = GetOptions(
+	'encrypt|enc|e' => \$encrypt,
+	'decrypt' => \$decrypt,
+	'help' => sub {pod2usage(-verbose => 2)},
+);
+
+print Dumper $opts;
 
 my $filename = shift
-or usage()
+or pod2usage()
 and exit 0;
 
 my $term = Term::ReadLine->new('Cypher')
@@ -49,21 +62,6 @@ while(1) {
 exit 0;
 
 ########## Command line functions ###########################
-
-sub help {
-	say "available commands: ";
-	say "\t put KEY VAL";
-	say "\t\t puts pair KEY:VAL into storage";
-	say "\t get KEY";
-	say "\t\t gets and shows stored value for key KEY";
-	say "\t search MASK";
-	say "\t\t searches and shows all keys, containing MASK as substring";
-	say "\t del KEY";
-	say "\t\t deletes key KEY from storage";
-	say "\t dump REGEXP";
-	say "\t\t dumps all data for keys matching perl regexp /^REGEXP\$/";
-	say "\n You can use <TAB> for autocompletion for commands and data keys";
-}
 
 sub dump_vals {
 	my $re = shift;
@@ -173,7 +171,6 @@ sub store_data {
 	my $data = shift;
 	my $filename = shift;
 
-
 	my $ice = encrypt($cypher,freeze($data));
 
 	write_file($ice,$filename);
@@ -216,11 +213,6 @@ sub decrypt {
 	return $data;
 }
 
-sub usage {
-	say "
-	USAGE: $0 file_name
-	";
-}
 
 sub read_password {
 	my $term = shift;
@@ -294,4 +286,92 @@ sub trim {
 	$s =~ s/^\s+|\s+$//g;
 	return $s;
 }
+
+=pod
+
+=head1 NAME
+
+=over
+
+Cypher - command line cypher tool to work with encrypted key-value storage. Can be used to encrypt and decrypt whole files
+
+=back
+
+=head1 SYNOPSIS
+
+=over
+
+./cypher [-ed] I<filename>
+
+By default goes into Secure Storage Mode - loads encrypted file and provides interface to manipulate it. See L</USER COMMANDS>. If -e or -d options provided, cypher works as encrypter or decrypter accordingly, dumps its result to STDOUT and exits immediately.
+
+=back
+
+=head1 AGRUMENTS
+
+=over
+
+=item -e I<filename>
+
+Read unencrypted I<filename> and dump it encrypted to STDOUT
+
+=back
+
+=over
+
+=item -d I<filename>
+
+Read encrypted I<filename> and dump it decrypted to STDOUT
+
+=back
+
+=head1 USER COMMANDS
+
+Following commands available in Secure Storage Mode:
+
+=over
+
+=item * put KEY VAL
+
+Puts pair KEY:VAL into storage
+
+=back
+
+=over
+
+=item * get KEY
+
+Gets and shows stored value for key KEY
+
+=back
+
+=over
+
+=item * search MASK
+
+Searches and shows all keys, containing MASK as substring
+
+=back
+
+=over
+
+=item * del KEY
+
+Deletes key KEY from storage
+
+=back
+
+=over
+
+=item * dump REGEXP
+
+Dumps all data for keys matching perl regexp /^REGEXP\$/
+
+=back
+
+=head1 STORAGE MODE FEATURES
+
+You can use <TAB> for autocompletion for commands and data keys
+
+=cut
 
