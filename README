@@ -4,11 +4,13 @@ cypher
 The simple key-value storage for private data. Uses AES algoritm to encrypt storage file. The key benefit of this storage - is that you don't need to decrypt the whole file and temporary store it on your computer.
 
 Implemented command set:
-put KEY VALUE - puts key value into encrypted storage
-get KEY - shows you stored VALUE for specified KEY
-search MASK - shows you all KEYS that satisfy specified MASK
+	put KEY VALUE - puts key value into encrypted storage
+	get RE - dump all saved keys, matching perl regexp RE with it's values
+	search MASK - shows you all KEYS that satisfy specified MASK
 
+use ./cypher --help to get detailed info
 
 Dependencies for Ubuntu:
-libcrypt-rijndael-perl
-libterm-readline-gnu-perl
+	libcrypt-rijndael-perl
+	libterm-readline-gnu-perl
+	libswitch-perl
