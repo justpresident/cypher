@@ -46,7 +46,6 @@ while(1) {
 		case "get" { get(@args) }
 		case "put" { put(@args) }
 		case "del" { del(@args)}
-		case "dump" { dump_vals(@args) }
 		case "help" {help(@args)}
 		else { say "No such command '$cmd'\n" }
 	}
@@ -55,21 +54,6 @@ while(1) {
 exit 0;
 
 ########## Data Storage functions #########################
-
-sub dump_vals {
-	my $re = shift;
-
-	unless($re) {
-		say "syntax: dump REGEXP";
-		return;
-	}
-	
-	my @keys = grep{$_ =~ /^$re$/}(sort keys %$data);
-
-	foreach my $key(@keys) {
-		say "$key: ".$data->{$key};
-	}
-}
 
 sub put {
 	my $key = shift;
@@ -87,13 +71,22 @@ sub put {
 }
 
 sub get {
-	my $key = shift;
+	my $re = shift;
 
-	my $val = $data->{$key};
-	if ($val) {
-		say "$key: $val";
-	} else {
-		say "No such key '$key' found";
+	unless($re) {
+		say "syntax: get REGEXP";
+		return;
+	}
+
+	my @keys = grep{$_ =~ /^$re$/}(sort keys %$data);
+
+	unless(scalar(@keys)) {
+		say "No keys matching '$re' found!";
+		return;
+	}
+
+	foreach my $key(@keys) {
+		say "$key: ".$data->{$key};
 	}
 }
 
@@ -276,7 +269,7 @@ sub autocomplete {
 			return $term->completion_matches($text,\&keyword);
 		}
 	} else {
-			my @all_commands = qw(put get search del dump help);
+			my @all_commands = qw(put get search del help);
 			return grep { /^\Q$text/ } (sort @all_commands);
 	}
 
@@ -361,9 +354,9 @@ Puts pair KEY:VAL into storage
 
 =over
 
-=item * get KEY
+=item * get REGEXP
 
-Gets and shows stored value for key KEY
+Dumps all data for keys matching perl regexp /^REGEXP\$/
 
 =back
 
@@ -380,14 +373,6 @@ Searches and shows all keys, containing MASK as substring
 =item * del KEY
 
 Deletes key KEY from storage
-
-=back
-
-=over
-
-=item * dump REGEXP
-
-Dumps all data for keys matching perl regexp /^REGEXP\$/
 
 =back
 
