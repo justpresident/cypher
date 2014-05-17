@@ -21,7 +21,7 @@ or croak "Term Readline error";
 
 my $opts = GetOptions(
 	'encrypt|enc|e' => sub {enc_cmd(\&encrypt)},
-	'decrypt' => sub {enc_cmd(\&decrypt)},
+	'decrypt|dec|d' => sub {enc_cmd(\&decrypt)},
 	'help' => sub {pod2usage(-verbose => 2)},
 ) or pod2usage();
 
