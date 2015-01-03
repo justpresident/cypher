@@ -15,6 +15,9 @@ use Term::ReadLine;
 use Getopt::Long;
 use Pod::Usage;
 
+my $STANDBY_TIMEOUT = 300;
+my $last_user_active :shared = time();
+
 my $term = Term::ReadLine->new('Cypher')
 or croak "Term Readline error";
 
@@ -36,6 +39,9 @@ while(1) {
 	my $line = $term->readline('cypher > ');
 	last if !defined $line;
 
+	last if (time() - $last_user_active > $STANDBY_TIMEOUT);
+	$last_user_active = time();
+
 	$line = trim($line);
 	next unless $line;
 
@@ -51,6 +57,8 @@ while(1) {
 	}
 }
 
+
+system('clear');
 exit 0;
 
 ########## Data Storage functions #########################
