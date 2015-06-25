@@ -18,15 +18,14 @@ use Pod::Usage;
 my $STANDBY_TIMEOUT = 300;
 my $last_user_active :shared = time();
 
-my $term = Term::ReadLine->new('Cypher')
-or croak "Term Readline error";
-
-
-my $opts = GetOptions(
+GetOptions(
 	'encrypt|enc|e' => sub {enc_cmd(\&encrypt)},
 	'decrypt|dec|d' => sub {enc_cmd(\&decrypt)},
 	'help' => sub {pod2usage(-verbose => 2)},
 ) or pod2usage();
+
+my $term = Term::ReadLine->new('Cypher')
+or croak "Term Readline error";
 
 my $filename = shift
 or pod2usage();
@@ -277,8 +276,8 @@ sub autocomplete {
 			return $term->completion_matches($text,\&keyword);
 		}
 	} else {
-			my @all_commands = qw(put get search del help);
-			return grep { /^\Q$text/ } (sort @all_commands);
+		my @all_commands = qw(put get search del help);
+		return grep { /^\Q$text/ } (sort @all_commands);
 	}
 
 	return undef;
