@@ -6,8 +6,7 @@ use warnings;
 use strict;
 use autodie;
 
-use POSIX qw(strftime);
-
+use Storable qw(freeze thaw);
 use Data::Dumper;
 use Switch;
 use Carp;
@@ -16,10 +15,6 @@ use Term::ReadLine;
 use Getopt::Long;
 use Pod::Usage;
 
-my $DEF_CYPHER_VERSION = 2;
-my $STORE_VER_3 = 3;
-my $STORE_VER_4 = 4;
-my $DEF_STORE_VERSION = $STORE_VER_4;
 my $STANDBY_TIMEOUT = 300;
 my $last_user_active :shared = time();
 
@@ -53,8 +48,7 @@ while(1) {
 
 	switch($cmd) {
 		case "search" { search(@args) }
-		case "get" { get(0, @args) }
-		case "history" {get(1, @args)}
+		case "get" { get(@args) }
 		case "put" { put(@args) }
 		case "del" { del(@args)}
 		case "help" {help(@args)}
@@ -77,14 +71,13 @@ sub put {
 		return;
 	}
 
-	push @{$data->{$key}}, [$val, int(time)];
+	$data->{$key} = $val;
 	say "$key stored";
 
 	store_data($cypher, $data, $filename);
 }
 
 sub get {
-	my $get_history = shift || 0;
 	my $re = shift;
 
 	unless($re) {
@@ -99,20 +92,8 @@ sub get {
 		return;
 	}
 
-	if ($get_history) {
-		if (scalar(keys @keys) > 1) {
-			say "more than one elements found: ". join(' ', @keys);
-			return;
-		}
-		my $key = $keys[0];
-		for my $val (@{$data->{$key}}) {
-			my $val_time = strftime("%Y-%m-%d %H:%M:%S",localtime($val->[1]));
-			say "[$val_time]: $val->[0]";
-		}
-	} else {
-		foreach my $key(@keys) {
-			say "$key: " . $data->{$key}->[-1]->[0];
-		}
+	foreach my $key(@keys) {
+		say "$key: ".$data->{$key};
 	}
 }
 
@@ -174,26 +155,20 @@ sub encrypt {
 	my $cypher = shift;
 	my $data = shift;
 
-	my $version = pack('n', $DEF_CYPHER_VERSION);
-
 	my $pad = '~' x (16 - (length($data) % 16));
 	$data .= $pad;
 
-	return $version . pack('Ca*', length($pad), $cypher->encrypt($data));
+	return length($pad)."-".$cypher->encrypt($data);
 }
 
 sub decrypt {
 	my $cypher = shift;
 	my $data = shift;
 
-	(my $version, $data) = unpack('na*', $data);
+	(my $pad_length,$data) = split(/-/,$data,2);
 
-	if ($version == $DEF_CYPHER_VERSION) {
-		(my $pad_length, $data) = unpack('Ca*', $data);
-
-		$data = $cypher->decrypt($data);
-		$data = substr($data, 0, -1*$pad_length);
-	}
+	$data = $cypher->decrypt($data);
+	$data = substr($data, 0, -1*$pad_length);
 
 	return $data;
 }
@@ -220,78 +195,6 @@ sub read_password {
 
 ########### Data I/O functions ##############################
 
-sub deserialize {
-	my $str = shift;
-
-	my $result = {};
-
-	(my $store_version, $str) = unpack('na*', $str);
-
-	# define closure to get next element
-	my $get_next_elem_sub;
-	if ($store_version == $STORE_VER_3) {
-		$get_next_elem_sub = sub {
-			(my $k, my $v, $str) = unpack('n/a* N/a* a*', $str);
-			return ($k, $v, 0);
-		};
-	} elsif($store_version == $STORE_VER_4) {
-		$get_next_elem_sub = sub {
-			(my $k, my $v, my $t, $str) = unpack('n/a* N/a* N/a* a*', $str);
-			return ($k, $v, $t);
-		};
-	}
-
-	# loop to read all elements
-	if ($store_version == $STORE_VER_3 || $store_version == $STORE_VER_4) {
-		(my $elements, $str) = unpack('Na*', $str);
-		my $elements_read = 0;
-		while($str) {
-			my ($k, $v, $t) = $get_next_elem_sub->();
-			if (defined $k) {
-				$elements_read++;
-				push @{$result->{$k}}, [$v, $t];
-			}
-		}
-
-		if ($elements != $elements_read) {
-			die "File is corrupted";
-		}
-	} else {
-		die "File format is not supported";
-	}
-
-	foreach my $key(keys %$result) {
-		$result->{$key} = [sort{$a->[1] <=> $b->[1]}(@{$result->{$key}})];
-	}
-
-	return $result;
-}
-
-sub serialize {
-	my $data = shift;
-
-	my $elements_count = 0;
-	my $body = '';
-	keys %$data;
-	while (my ($k,$vals_arr) = each %$data) {
-		foreach my $val (@$vals_arr) {
-			my ($v,$t) = @$val;
-			$t ||= int(time);
-			if ($DEF_STORE_VERSION == $STORE_VER_3) {
-				$body .= pack('n/a* N/a*', $k, $v);
-			} elsif ($DEF_STORE_VERSION == $STORE_VER_4) {
-				$body .= pack('n/a* N/a* N/a*', $k, $v, $t);
-			}
-			$elements_count++;
-		}
-	}
-
-	my $header = pack('n', $DEF_STORE_VERSION);
-	$header .= pack('N', $elements_count);
-
-	return $header.$body;
-}
-
 sub load_data {
 	my $cypher = shift;
 	my $filename = shift;
@@ -304,7 +207,7 @@ sub load_data {
 
 	$data = decrypt($cypher,$data);
 
-	return deserialize($data);
+	return thaw($data);
 }
 
 sub store_data {
@@ -312,7 +215,7 @@ sub store_data {
 	my $data = shift;
 	my $filename = shift;
 
-	my $ice = encrypt($cypher,serialize($data));
+	my $ice = encrypt($cypher,freeze($data));
 
 	write_file($ice,$filename);
 
@@ -368,12 +271,12 @@ sub autocomplete {
 #	print "ac: $text,$line\t$cmd,'".scalar(@args)."'\n";
 
 	if (@args) {
-		if ($cmd =~ /^(search|get|history|del|put)$/) {
+		if ($cmd =~ /^(search|get|del|put)$/) {
 			return undef if @args > 1;
 			return $term->completion_matches($text,\&keyword);
 		}
 	} else {
-		my @all_commands = qw(put get history search del help);
+		my @all_commands = qw(put get search del help);
 		return grep { /^\Q$text/ } (sort @all_commands);
 	}
 
@@ -461,14 +364,6 @@ Puts pair KEY:VAL into storage
 =item * get REGEXP
 
 Dumps all data for keys matching perl regexp /^REGEXP\$/
-
-=back
-
-=over
-
-=item * history KEY
-
-Dumps history of changes of KEY
 
 =back
 
