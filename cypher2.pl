@@ -6,6 +6,8 @@ use warnings;
 use strict;
 use autodie;
 
+use POSIX qw(strftime);
+
 use Data::Dumper;
 use Switch;
 use Carp;
@@ -15,7 +17,9 @@ use Getopt::Long;
 use Pod::Usage;
 
 my $DEF_CYPHER_VERSION = 2;
-my $DEF_STORE_VERSION = 3;
+my $STORE_VER_3 = 3;
+my $STORE_VER_4 = 4;
+my $DEF_STORE_VERSION = $STORE_VER_4;
 my $STANDBY_TIMEOUT = 300;
 my $last_user_active :shared = time();
 
@@ -49,7 +53,8 @@ while(1) {
 
 	switch($cmd) {
 		case "search" { search(@args) }
-		case "get" { get(@args) }
+		case "get" { get(0, @args) }
+		case "history" {get(1, @args)}
 		case "put" { put(@args) }
 		case "del" { del(@args)}
 		case "help" {help(@args)}
@@ -72,13 +77,14 @@ sub put {
 		return;
 	}
 
-	$data->{$key} = $val;
+	push @{$data->{$key}}, [$val, int(time)];
 	say "$key stored";
 
 	store_data($cypher, $data, $filename);
 }
 
 sub get {
+	my $get_history = shift || 0;
 	my $re = shift;
 
 	unless($re) {
@@ -93,8 +99,20 @@ sub get {
 		return;
 	}
 
-	foreach my $key(@keys) {
-		say "$key: ".$data->{$key};
+	if ($get_history) {
+		if (scalar(keys @keys) > 1) {
+			say "more than one elements found: ". join(' ', @keys);
+			return;
+		}
+		my $key = $keys[0];
+		for my $val (@{$data->{$key}}) {
+			my $val_time = strftime("%Y-%m-%d %H:%M:%S",localtime($val->[1]));
+			say "[$val_time]: $val->[0]";
+		}
+	} else {
+		foreach my $key(@keys) {
+			say "$key: " . $data->{$key}->[-1]->[0];
+		}
 	}
 }
 
@@ -209,14 +227,29 @@ sub deserialize {
 
 	(my $store_version, $str) = unpack('na*', $str);
 
-	if ($store_version == $DEF_STORE_VERSION) {
+	# define closure to get next element
+	my $get_next_elem_sub;
+	if ($store_version == $STORE_VER_3) {
+		$get_next_elem_sub = sub {
+			(my $k, my $v, $str) = unpack('n/a* N/a* a*', $str);
+			return ($k, $v, 0);
+		};
+	} elsif($store_version == $STORE_VER_4) {
+		$get_next_elem_sub = sub {
+			(my $k, my $v, my $t, $str) = unpack('n/a* N/a* N/a* a*', $str);
+			return ($k, $v, $t);
+		};
+	}
+
+	# loop to read all elements
+	if ($store_version == $STORE_VER_3 || $store_version == $STORE_VER_4) {
 		(my $elements, $str) = unpack('Na*', $str);
 		my $elements_read = 0;
 		while($str) {
-			(my $k, my $v, $str) = unpack('n/a* N/a* a*', $str);
+			my ($k, $v, $t) = $get_next_elem_sub->();
 			if (defined $k) {
 				$elements_read++;
-				$result->{$k} = $v;
+				push @{$result->{$k}}, [$v, $t];
 			}
 		}
 
@@ -226,20 +259,37 @@ sub deserialize {
 	} else {
 		die "File format is not supported";
 	}
+
+	foreach my $key(keys %$result) {
+		$result->{$key} = [sort{$a->[1] <=> $b->[1]}(@{$result->{$key}})];
+	}
+
 	return $result;
 }
 
 sub serialize {
 	my $data = shift;
 
-	my $result = pack('n', $DEF_STORE_VERSION);
-	$result .= pack('N', scalar(keys %$data));
+	my $elements_count = 0;
+	my $body = '';
 	keys %$data;
-	while (my ($k,$v) = each %$data) {
-		$result .= pack('n/a* N/a*', $k, $v);
+	while (my ($k,$vals_arr) = each %$data) {
+		foreach my $val (@$vals_arr) {
+			my ($v,$t) = @$val;
+			$t ||= int(time);
+			if ($DEF_STORE_VERSION == $STORE_VER_3) {
+				$body .= pack('n/a* N/a*', $k, $v);
+			} elsif ($DEF_STORE_VERSION == $STORE_VER_4) {
+				$body .= pack('n/a* N/a* N/a*', $k, $v, $t);
+			}
+			$elements_count++;
+		}
 	}
 
-	return $result;
+	my $header = pack('n', $DEF_STORE_VERSION);
+	$header .= pack('N', $elements_count);
+
+	return $header.$body;
 }
 
 sub load_data {
@@ -318,12 +368,12 @@ sub autocomplete {
 #	print "ac: $text,$line\t$cmd,'".scalar(@args)."'\n";
 
 	if (@args) {
-		if ($cmd =~ /^(search|get|del|put)$/) {
+		if ($cmd =~ /^(search|get|history|del|put)$/) {
 			return undef if @args > 1;
 			return $term->completion_matches($text,\&keyword);
 		}
 	} else {
-		my @all_commands = qw(put get search del help);
+		my @all_commands = qw(put get history search del help);
 		return grep { /^\Q$text/ } (sort @all_commands);
 	}
 
@@ -411,6 +461,14 @@ Puts pair KEY:VAL into storage
 =item * get REGEXP
 
 Dumps all data for keys matching perl regexp /^REGEXP\$/
+
+=back
+
+=over
+
+=item * history KEY
+
+Dumps history of changes of KEY
 
 =back
 
