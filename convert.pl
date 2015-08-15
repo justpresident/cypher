@@ -150,7 +150,7 @@ sub serialize {
 			if ($DEF_STORE_VERSION == $STORE_VER_3) {
 				$body .= pack('n/a* N/a*', $k, $v);
 			} elsif ($DEF_STORE_VERSION == $STORE_VER_4) {
-				$body .= pack('n/a* N/a* N/a*', $k, $v, $t);
+				$body .= pack('n/a* N/a* N', $k, $v, $t);
 			}
 			$elements_count++;
 		}

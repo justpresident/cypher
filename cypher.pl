@@ -236,7 +236,7 @@ sub deserialize {
 		};
 	} elsif($store_version == $STORE_VER_4) {
 		$get_next_elem_sub = sub {
-			(my $k, my $v, my $t, $str) = unpack('n/a* N/a* N/a* a*', $str);
+			(my $k, my $v, my $t, $str) = unpack('n/a* N/a* N a*', $str);
 			return ($k, $v, $t);
 		};
 	}
@@ -280,7 +280,7 @@ sub serialize {
 			if ($DEF_STORE_VERSION == $STORE_VER_3) {
 				$body .= pack('n/a* N/a*', $k, $v);
 			} elsif ($DEF_STORE_VERSION == $STORE_VER_4) {
-				$body .= pack('n/a* N/a* N/a*', $k, $v, $t);
+				$body .= pack('n/a* N/a* N', $k, $v, $t);
 			}
 			$elements_count++;
 		}
