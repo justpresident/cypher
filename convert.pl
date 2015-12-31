@@ -60,7 +60,7 @@ sub read_file {
 	my $data = '';
 
 	my $bytes_read = sysread($file, $data, $fsize) || 0;
-	
+
 	$bytes_read == $fsize
 	or croak("Can't load $file: $!");
 

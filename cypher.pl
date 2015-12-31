@@ -9,6 +9,7 @@ use autodie;
 use POSIX qw(strftime);
 
 use Data::Dumper;
+$Data::Dumper::Sortkeys = 1;
 use Switch;
 use Carp;
 use Crypt::Rijndael;
@@ -23,14 +24,14 @@ my $DEF_STORE_VERSION = $STORE_VER_4;
 my $STANDBY_TIMEOUT = 300;
 my $last_user_active :shared = time();
 
-GetOptions(
-	'encrypt|enc|e' => sub {enc_cmd(\&encrypt)},
-	'decrypt|dec|d' => sub {enc_cmd(\&decrypt)},
-	'help' => sub {pod2usage(-verbose => 2)},
-) or pod2usage();
-
 my $term = Term::ReadLine->new('Cypher')
 or croak "Term Readline error";
+
+GetOptions(
+	'encrypt|enc|e' => sub {enc_cmd(\&encrypt, \&serialize  )},
+	'decrypt|dec|d' => sub {enc_cmd(\&decrypt, \&deserialize)},
+	'help' => sub {pod2usage(-verbose => 2)},
+) or pod2usage();
 
 my $filename = shift
 or pod2usage();
@@ -153,6 +154,7 @@ sub mk_cypher {
 
 sub enc_cmd {
 	my $func = shift;
+    my $post_func = shift;
 
 	my $filename = shift @ARGV;
 
@@ -164,8 +166,12 @@ sub enc_cmd {
 	my $cypher = mk_cypher($term, $filename);
 	$data = &$func($cypher, $data);
 
+    if ($post_func) {
+        $data = &$post_func($data);
+    }
+
 	binmode(STDOUT);
-	print $data;
+	print Dumper($data);
 
 	exit(0);
 }
@@ -329,7 +335,7 @@ sub read_file {
 	my $data = '';
 
 	my $bytes_read = sysread($file, $data, $fsize) || 0;
-	
+
 	$bytes_read == $fsize
 	or croak("Can't load $file: $!");
 
@@ -353,7 +359,7 @@ sub write_file {
 
 ############# Auto completion ###############################
 
-sub autocomplete {	
+sub autocomplete {
 	my $text = shift;
 	my $line = shift;
 	my $start = shift;

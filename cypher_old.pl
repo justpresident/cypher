@@ -232,7 +232,7 @@ sub read_file {
 	my $data = '';
 
 	my $bytes_read = sysread($file, $data, $fsize) || 0;
-	
+
 	$bytes_read == $fsize
 	or croak("Can't load $file: $!");
 
@@ -256,7 +256,7 @@ sub write_file {
 
 ############# Auto completion ###############################
 
-sub autocomplete {	
+sub autocomplete {
 	my $text = shift;
 	my $line = shift;
 	my $start = shift;
