@@ -1,3 +1,9 @@
-libcrypt-rijndael-perl
-libterm-readline-gnu-perl
-libswitch-perl
+Ubuntu:
+    libcrypt-rijndael-perl
+    libterm-readline-gnu-perl
+    libswitch-perl
+Fedora:
+    perl-autodie
+    perl-Switch
+    perl-Crypt-Rijndael
+    perl-Term-ReadLine-Gnu
