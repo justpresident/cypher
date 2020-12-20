@@ -28,8 +28,8 @@ my $term = Term::ReadLine->new('Cypher')
 or croak "Term Readline error";
 
 GetOptions(
-	'encrypt|enc|e' => sub {enc_cmd(\&encrypt, \&serialize  )},
-	'decrypt|dec|d' => sub {enc_cmd(\&decrypt, \&deserialize)},
+	'encrypt|enc|e' => sub {enc_cmd(\&encrypt)},
+	'decrypt|dec|d' => sub {enc_cmd(\&decrypt)},
 	'help' => sub {pod2usage(-verbose => 2)},
 ) or pod2usage();
 
@@ -139,7 +139,7 @@ sub search {
 	say join("\n", @keys);
 }
 
-########### Encrypter functions #############################
+########### Encryption functions #############################
 
 sub mk_cypher {
 	my $term = shift;
@@ -171,7 +171,7 @@ sub enc_cmd {
     }
 
 	binmode(STDOUT);
-	print Dumper($data);
+	print $data;
 
 	exit(0);
 }
@@ -224,7 +224,7 @@ sub read_password {
 	return $key;
 }
 
-########### Data I/O functions ##############################
+########### Passwords file serialization functions ##############################
 
 sub deserialize {
 	my $str = shift;
@@ -298,6 +298,8 @@ sub serialize {
 	return $header.$body;
 }
 
+########### Data load functions ##############################
+
 sub load_data {
 	my $cypher = shift;
 	my $filename = shift;
@@ -325,10 +327,12 @@ sub store_data {
 	return 1;
 }
 
+########### System I/O functions ##############################
+
 sub read_file {
 	my $filename = shift;
 
-	open(my $file, "<$filename");
+	open(my $file, "<", $filename);
 	binmode($file);
 
 	my $fsize = -s $filename;
@@ -346,15 +350,22 @@ sub read_file {
 
 sub write_file {
 	my $data = shift;
-	my $filename = shift;
+	my $filename = shift || "-";
 
-	open(my $file, ">$filename");
+    my $file;
+    if ($filename eq "-") {
+        $file = *STDOUT;
+    } else {
+        open($file, ">", $filename);
+    }
 	binmode($file);
 
 	syswrite($file, $data)
 	or croak("Write $file failed: $!");
 
-	close($file);
+    if ($filename ne "-") {
+	    close($file);
+    }
 }
 
 ############# Auto completion ###############################
