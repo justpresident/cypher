@@ -45,7 +45,7 @@ if (basename($0) eq 'cypher.pl') {
 
 sub cypher {
     $term = Term::ReadLine->new('Cypher')
-    or croak "Term Readline error";
+        or croak "Term Readline error";
 
     GetOptions(
         'encrypt|enc|e' => sub {enc_cmd(\&encrypt_file)},
@@ -54,8 +54,8 @@ sub cypher {
     ) or pod2usage();
 
     $filename = shift(@ARGV)
-    or print STDERR "File parameter is not found\n"
-    and pod2usage();
+        or print STDERR "File parameter is not found\n"
+        and pod2usage();
 
     $cypher = mk_cypher($term, $filename);
 
@@ -90,113 +90,113 @@ sub cypher {
 ########## Data Storage functions #########################
 
 sub put {
-	my $key = shift;
-	my $val = shift;
+    my $key = shift;
+    my $val = shift;
 
-	unless ($key && $val) {
-		say "syntax: put KEY VAL";
-		return;
-	}
+    unless ($key && $val) {
+        say "syntax: put KEY VAL";
+        return;
+    }
 
-	push @{$data->{$key}}, [$val, int(time)];
-	say "$key stored";
+    push @{$data->{$key}}, [$val, int(time)];
+    say "$key stored";
 
-	store_data($cypher, $data, $filename);
+    store_data($cypher, $data, $filename);
 }
 
 sub get {
-	my $get_history = shift || 0;
-	my $re = shift;
+    my $get_history = shift || 0;
+    my $re = shift;
 
-	unless($re) {
-		say "syntax: get REGEXP";
-		return;
-	}
+    unless($re) {
+        say "syntax: get REGEXP";
+        return;
+    }
 
-	my @keys = grep{$_ =~ /^$re$/}(sort keys %$data);
+    my @keys = grep{$_ =~ /^$re$/}(sort keys %$data);
 
-	unless(scalar(@keys)) {
-		say "No keys matching '$re' found!";
-		return;
-	}
+    unless(scalar(@keys)) {
+        say "No keys matching '$re' found!";
+        return;
+    }
 
-	if ($get_history) {
-		if (scalar(keys @keys) > 1) {
-			say "more than one elements found: ". join(' ', @keys);
-			return;
-		}
-		my $key = $keys[0];
-		for my $val (@{$data->{$key}}) {
-			my $val_time = strftime("%Y-%m-%d %H:%M:%S",localtime($val->[1]));
-			say "[$val_time]: $val->[0]";
-		}
-	} else {
-		foreach my $key(@keys) {
-			say "$key: " . $data->{$key}->[-1]->[0];
-		}
-	}
+    if ($get_history) {
+        if (scalar(keys @keys) > 1) {
+            say "more than one elements found: ". join(' ', @keys);
+            return;
+        }
+        my $key = $keys[0];
+        for my $val (@{$data->{$key}}) {
+            my $val_time = strftime("%Y-%m-%d %H:%M:%S",localtime($val->[1]));
+            say "[$val_time]: $val->[0]";
+        }
+    } else {
+        foreach my $key(@keys) {
+            say "$key: " . $data->{$key}->[-1]->[0];
+        }
+    }
 }
 
 sub del {
-	my $key = shift;
+    my $key = shift;
 
-	my $val = $data->{$key};
-	if ($data->{$key}) {
-		delete $data->{$key};
-		say "$key: $val deleted";
+    my $val = $data->{$key};
+    if ($data->{$key}) {
+        delete $data->{$key};
+        say "$key: $val deleted";
 
-		store_data($cypher, $data, $filename);
-	} else {
-		say "No such key '$key' found";
-	}
+        store_data($cypher, $data, $filename);
+    } else {
+        say "No such key '$key' found";
+    }
 }
 
 sub search {
-	my $re = shift || '';
+    my $re = shift || '';
 
-	my @keys = grep{$_ =~ /$re/}(sort keys %$data);
+    my @keys = grep{$_ =~ /$re/}(sort keys %$data);
 
-	say join("\n", @keys);
+    say join("\n", @keys);
 }
 
 ########### Encryption functions #############################
 
 sub mk_cypher {
-	my $term = shift;
-	my $filename = shift;
+    my $term = shift;
+    my $filename = shift;
 
-	my $key = read_password($term, $filename);
+    my $key = read_password($term, $filename);
 
-	my $cypher = Crypt::Rijndael->new( $key, Crypt::Rijndael::MODE_CBC() );
+    my $cypher = Crypt::Rijndael->new( $key, Crypt::Rijndael::MODE_CBC() );
 
-	return $cypher;
+    return $cypher;
 }
 
 sub enc_cmd {
-	my $func = shift;
+    my $func = shift;
 
-	my $filename = shift @ARGV;
+    my $filename = shift @ARGV;
 
-	defined $filename && -f $filename
-	or pod2usage(-verbose => 99, -sections=>["SYNOPSIS", "ARGUMENTS"]);
+    defined $filename && -f $filename
+        or pod2usage(-verbose => 99, -sections=>["SYNOPSIS", "ARGUMENTS"]);
 
-	my $cypher = mk_cypher($term, $filename);
-	
+    my $cypher = mk_cypher($term, $filename);
+
     $data = &$func($cypher, $filename);
 
-	binmode(STDOUT);
-	print $data;
+    binmode(STDOUT);
+    print $data;
 
-	exit(0);
+    exit(0);
 }
 
 sub encrypt_file {
-	my $cypher = shift;
-	my $filename = shift;
-	my $out_filename = shift || "-";
+    my $cypher = shift;
+    my $filename = shift;
+    my $out_filename = shift || "-";
 
-	open(my $file, "<", $filename);
-	binmode($file);
+    open(my $file, "<", $filename);
+    binmode($file);
 
     my $outfile;
     if ($out_filename eq "-") {
@@ -205,7 +205,7 @@ sub encrypt_file {
         open($outfile, ">", $out_filename);
     }
     binmode($outfile);
-	
+
     my $version = pack('n', $ENCRYPTED_FILE_VER_1);
 
     syswrite($outfile, $version);
@@ -228,25 +228,25 @@ sub encrypt_file {
         }
 
         $data = $cypher->encrypt($data);
-        
+
         syswrite($outfile, $data);
     }
-	close($file);
+    close($file);
 
     syswrite($outfile, pack("C", $pad_length));
-    
+
     if ($out_filename eq "-") {
         close($out_filename);
     }
 }
 
 sub decrypt_file {
-	my $cypher = shift;
-	my $filename = shift;
-	my $out_filename = shift || "-";
+    my $cypher = shift;
+    my $filename = shift;
+    my $out_filename = shift || "-";
 
-	open(my $file, "<", $filename);
-	binmode($file);
+    open(my $file, "<", $filename);
+    binmode($file);
 
     my $outfile;
     if ($out_filename eq "-") {
@@ -254,9 +254,9 @@ sub decrypt_file {
     } else {
         open($outfile, ">", $out_filename);
     }
-	
+
     binmode($outfile);
- 
+
     my $version;
     my $bytes_read = sysread($file, $version, 2);
     ($version) = unpack('n', $version);
@@ -273,225 +273,225 @@ sub decrypt_file {
             croak("Unexpected end of file, bytes_read = $bytes_read");
         }
         my $pad_length = unpack('C', substr($last_block,-1));
-        
+
         my $last_decrypted = $cypher->decrypt(substr($last_block, 0, -1));
         if ($pad_length > 0) {
-		    $last_decrypted = substr($last_decrypted, 0, -1*$pad_length);
+            $last_decrypted = substr($last_decrypted, 0, -1*$pad_length);
         }
         syswrite($outfile, $last_decrypted);
     } else {
         croak("Unknown file encryption format");
     }
-    
+
     if ($out_filename eq "-") {
         close($out_filename);
     }
 }
 
 sub encrypt {
-	my $cypher = shift;
-	my $data = shift;
+    my $cypher = shift;
+    my $data = shift;
 
-	my $version = pack('n', $DEF_CYPHER_VERSION);
+    my $version = pack('n', $DEF_CYPHER_VERSION);
 
-	my $pad = '~' x (16 - (length($data) % 16));
-	$data .= $pad;
+    my $pad = '~' x (16 - (length($data) % 16));
+    $data .= $pad;
 
-	return $version . pack('Ca*', length($pad), $cypher->encrypt($data));
+    return $version . pack('Ca*', length($pad), $cypher->encrypt($data));
 }
 
 sub decrypt {
-	my $cypher = shift;
-	my $data = shift;
+    my $cypher = shift;
+    my $data = shift;
 
-	(my $version, $data) = unpack('na*', $data);
+    (my $version, $data) = unpack('na*', $data);
 
-	if ($version == $DEF_CYPHER_VERSION) {
-		(my $pad_length, $data) = unpack('Ca*', $data);
+    if ($version == $DEF_CYPHER_VERSION) {
+        (my $pad_length, $data) = unpack('Ca*', $data);
 
-		$data = $cypher->decrypt($data);
-		$data = substr($data, 0, -1*$pad_length);
-	}
+        $data = $cypher->decrypt($data);
+        $data = substr($data, 0, -1*$pad_length);
+    }
 
-	return $data;
+    return $data;
 }
 
 
 sub read_password {
-	my $term = shift;
-	my $filename = shift;
+    my $term = shift;
+    my $filename = shift;
 
-	my $term_attribs = $term->Attribs;
-	$term_attribs->{redisplay_function} = $term_attribs->{shadow_redisplay};
+    my $term_attribs = $term->Attribs;
+    $term_attribs->{redisplay_function} = $term_attribs->{shadow_redisplay};
 
-	my $key = $term->readline("Enter Password for $filename: ");
+    my $key = $term->readline("Enter Password for $filename: ");
 
-	$term->remove_history($term->where_history);
-	$term_attribs->{redisplay_function} = undef;
+    $term->remove_history($term->where_history);
+    $term_attribs->{redisplay_function} = undef;
 
-	$key .= '~' x (32 - length($key));
+    $key .= '~' x (32 - length($key));
 
-	$term_attribs->{completion_function} = \&autocomplete;
+    $term_attribs->{completion_function} = \&autocomplete;
 
-	return $key;
+    return $key;
 }
 
 ########### Passwords file serialization functions ##############################
 
 sub deserialize {
-	my $str = shift;
+    my $str = shift;
 
-	my $result = {};
+    my $result = {};
 
-	(my $store_version, $str) = unpack('na*', $str);
+    (my $store_version, $str) = unpack('na*', $str);
 
-	# define closure to get next element
-	my $get_next_elem_sub;
-	if ($store_version == $STORE_VER_3) {
-		$get_next_elem_sub = sub {
-			(my $k, my $v, $str) = unpack('n/a* N/a* a*', $str);
-			return ($k, $v, 0);
-		};
-	} elsif($store_version == $STORE_VER_4) {
-		$get_next_elem_sub = sub {
-			(my $k, my $v, my $t, $str) = unpack('n/a* N/a* N a*', $str);
-			return ($k, $v, $t);
-		};
-	}
+    # define closure to get next element
+    my $get_next_elem_sub;
+    if ($store_version == $STORE_VER_3) {
+        $get_next_elem_sub = sub {
+            (my $k, my $v, $str) = unpack('n/a* N/a* a*', $str);
+            return ($k, $v, 0);
+        };
+    } elsif($store_version == $STORE_VER_4) {
+        $get_next_elem_sub = sub {
+            (my $k, my $v, my $t, $str) = unpack('n/a* N/a* N a*', $str);
+            return ($k, $v, $t);
+        };
+    }
 
-	# loop to read all elements
-	if ($store_version == $STORE_VER_3 || $store_version == $STORE_VER_4) {
-		(my $elements, $str) = unpack('Na*', $str);
-		my $elements_read = 0;
-		while($str) {
-			my ($k, $v, $t) = $get_next_elem_sub->();
-			if (defined $k) {
-				$elements_read++;
-				push @{$result->{$k}}, [$v, $t];
-			}
-		}
+    # loop to read all elements
+    if ($store_version == $STORE_VER_3 || $store_version == $STORE_VER_4) {
+        (my $elements, $str) = unpack('Na*', $str);
+        my $elements_read = 0;
+        while($str) {
+            my ($k, $v, $t) = $get_next_elem_sub->();
+            if (defined $k) {
+                $elements_read++;
+                push @{$result->{$k}}, [$v, $t];
+            }
+        }
 
-		if ($elements != $elements_read) {
-			die "File is corrupted";
-		}
-	} else {
-		die "File format is not supported";
-	}
+        if ($elements != $elements_read) {
+            die "File is corrupted";
+        }
+    } else {
+        die "File format is not supported";
+    }
 
-	foreach my $key(keys %$result) {
-		$result->{$key} = [sort{$a->[1] <=> $b->[1]}(@{$result->{$key}})];
-	}
+    foreach my $key(keys %$result) {
+        $result->{$key} = [sort{$a->[1] <=> $b->[1]}(@{$result->{$key}})];
+    }
 
-	return $result;
+    return $result;
 }
 
 sub serialize {
-	my $data = shift;
+    my $data = shift;
 
-	my $elements_count = 0;
-	my $body = '';
-	keys %$data;
-	while (my ($k,$vals_arr) = each %$data) {
-		foreach my $val (@$vals_arr) {
-			my ($v,$t) = @$val;
-			$t ||= int(time);
-			if ($DEF_STORE_VERSION == $STORE_VER_3) {
-				$body .= pack('n/a* N/a*', $k, $v);
-			} elsif ($DEF_STORE_VERSION == $STORE_VER_4) {
-				$body .= pack('n/a* N/a* N', $k, $v, $t);
-			}
-			$elements_count++;
-		}
-	}
+    my $elements_count = 0;
+    my $body = '';
+    keys %$data;
+    while (my ($k,$vals_arr) = each %$data) {
+        foreach my $val (@$vals_arr) {
+            my ($v,$t) = @$val;
+            $t ||= int(time);
+            if ($DEF_STORE_VERSION == $STORE_VER_3) {
+                $body .= pack('n/a* N/a*', $k, $v);
+            } elsif ($DEF_STORE_VERSION == $STORE_VER_4) {
+                $body .= pack('n/a* N/a* N', $k, $v, $t);
+            }
+            $elements_count++;
+        }
+    }
 
-	my $header = pack('n', $DEF_STORE_VERSION);
-	$header .= pack('N', $elements_count);
+    my $header = pack('n', $DEF_STORE_VERSION);
+    $header .= pack('N', $elements_count);
 
-	return $header.$body;
+    return $header.$body;
 }
 
 ########### Data load functions ##############################
 
 sub load_data {
-	my $cypher = shift;
-	my $filename = shift;
+    my $cypher = shift;
+    my $filename = shift;
 
-	unless(-f $filename) {
-		return {};
-	}
+    unless(-f $filename) {
+        return {};
+    }
 
-	my $data = read_file($filename, { binmode => ':raw' });
+    my $data = read_file($filename, { binmode => ':raw' });
 
-	$data = decrypt($cypher,$data);
+    $data = decrypt($cypher,$data);
 
-	return deserialize($data);
+    return deserialize($data);
 }
 
 sub store_data {
-	my $cypher = shift;
-	my $data = shift;
-	my $filename = shift;
+    my $cypher = shift;
+    my $data = shift;
+    my $filename = shift;
 
-	my $ice = encrypt($cypher,serialize($data));
+    my $ice = encrypt($cypher,serialize($data));
 
-	write_file($filename, {binmode => ':raw'}, $ice);
+    write_file($filename, {binmode => ':raw'}, $ice);
 
-	return 1;
+    return 1;
 }
 
 ############# Auto completion ###############################
 
 sub autocomplete {
-	my $text = shift;
-	my $line = shift;
-	my $start = shift;
-	my $end = shift;
+    my $text = shift;
+    my $line = shift;
+    my $start = shift;
+    my $end = shift;
 
-	$line = trim($line);
+    $line = trim($line);
 
-	my ($cmd,@args) = split(/\s+/, $line);
-	$cmd ||= '';
-	push @args, $text if $text eq '';
+    my ($cmd,@args) = split(/\s+/, $line);
+    $cmd ||= '';
+    push @args, $text if $text eq '';
 
-#	print "ac: $text,$line\t$cmd,'".scalar(@args)."'\n";
+    #	print "ac: $text,$line\t$cmd,'".scalar(@args)."'\n";
 
-	if (@args) {
-		if ($cmd =~ /^(search|get|history|del|put)$/) {
-			return undef if @args > 1;
-			return $term->completion_matches($text,\&keyword);
-		}
-	} else {
-		my @all_commands = qw(put get history search del help);
-		return grep { /^\Q$text/ } (sort @all_commands);
-	}
+    if (@args) {
+        if ($cmd =~ /^(search|get|history|del|put)$/) {
+            return undef if @args > 1;
+            return $term->completion_matches($text,\&keyword);
+        }
+    } else {
+        my @all_commands = qw(put get history search del help);
+        return grep { /^\Q$text/ } (sort @all_commands);
+    }
 
-	return undef;
+    return undef;
 }
 
 {
-	my @words = ();
-	my $i;
-	sub keyword {
-		my ($text, $state) = @_;
+    my @words = ();
+    my $i;
+    sub keyword {
+        my ($text, $state) = @_;
 
-#		return unless $text;
-		if($state) {
-			$i++;
-		} else { # first call
-			$i = 0;
-			@words = sort keys %$data;
-		}
-		for (; $i < scalar(@words); $i++) {
-			return $words[$i] if $words[$i] =~ /^\Q$text/;
-		};
-		return undef;
-	}
+        #		return unless $text;
+        if($state) {
+            $i++;
+        } else { # first call
+            $i = 0;
+            @words = sort keys %$data;
+        }
+        for (; $i < scalar(@words); $i++) {
+            return $words[$i] if $words[$i] =~ /^\Q$text/;
+        };
+        return undef;
+    }
 };
 
 sub trim {
-	my $s = shift;
-	$s =~ s/^\s+|\s+$//g;
-	return $s;
+    my $s = shift;
+    $s =~ s/^\s+|\s+$//g;
+    return $s;
 }
 
 1;
