@@ -13,6 +13,8 @@ $Data::Dumper::Sortkeys = 1;
 use Switch;
 use Carp;
 use Crypt::Rijndael;
+use File::Basename qw(basename);
+use File::Slurp qw(read_file write_file);
 use Term::ReadLine;
 use Getopt::Long;
 use Pod::Usage;
@@ -21,52 +23,70 @@ my $DEF_CYPHER_VERSION = 2;
 my $STORE_VER_3 = 3;
 my $STORE_VER_4 = 4;
 my $DEF_STORE_VERSION = $STORE_VER_4;
+
+my $ENCRYPTED_FILE_VER_1 = 5;
+
 my $STANDBY_TIMEOUT = 300;
 my $last_user_active :shared = time();
 
-my $term = Term::ReadLine->new('Cypher')
-or croak "Term Readline error";
+my $term;
+my $filename;
+my $cypher;
+my $data;
 
-GetOptions(
-	'encrypt|enc|e' => sub {enc_cmd(\&encrypt)},
-	'decrypt|dec|d' => sub {enc_cmd(\&decrypt)},
-	'help' => sub {pod2usage(-verbose => 2)},
-) or pod2usage();
-
-my $filename = shift
-or pod2usage();
-
-my $cypher = mk_cypher($term, $filename);
-
-my $data = load_data($cypher, $filename);
-
-while(1) {
-	my $line = $term->readline('cypher > ');
-	last if !defined $line;
-
-	last if (time() - $last_user_active > $STANDBY_TIMEOUT);
-	$last_user_active = time();
-
-	$line = trim($line);
-	next unless $line;
-
-	my ($cmd,@args) = split(/\s+/,$line,3);
-
-	switch($cmd) {
-		case "search" { search(@args) }
-		case "get" { get(0, @args) }
-		case "history" {get(1, @args)}
-		case "put" { put(@args) }
-		case "del" { del(@args)}
-		case "help" {help(@args)}
-		else { say "No such command '$cmd'\n" }
-	}
+# This is a weird hack to make this file testable.
+# If it is included from the test, it will do nothing.
+# I don't want to extract all the logic into modules 
+# to avoid the need of installing them into the system.
+# This is a simple script that contains all the logic in it.
+if (basename($0) eq 'cypher.pl') {
+    cypher();
 }
 
+sub cypher {
+    $term = Term::ReadLine->new('Cypher')
+    or croak "Term Readline error";
 
-system('clear');
-exit 0;
+    GetOptions(
+        'encrypt|enc|e' => sub {enc_cmd(\&encrypt_file)},
+        'decrypt|dec|d' => sub {enc_cmd(\&decrypt_file)},
+        'help' => sub {pod2usage(-verbose => 2)},
+    ) or pod2usage();
 
+    $filename = shift(@ARGV)
+    or print STDERR "File parameter is not found\n"
+    and pod2usage();
+
+    $cypher = mk_cypher($term, $filename);
+
+    $data = load_data($cypher, $filename);
+
+    while(1) {
+        my $line = $term->readline('cypher > ');
+        last if !defined $line;
+
+        last if (time() - $last_user_active > $STANDBY_TIMEOUT);
+        $last_user_active = time();
+
+        $line = trim($line);
+        next unless $line;
+
+        my ($cmd,@args) = split(/\s+/,$line,3);
+
+        switch($cmd) {
+            case "search" { search(@args) }
+            case "get" { get(0, @args) }
+            case "history" {get(1, @args)}
+            case "put" { put(@args) }
+            case "del" { del(@args)}
+            case "help" {help(@args)}
+            else { say "No such command '$cmd'\n" }
+        }
+    }
+
+    system('clear');
+    exit 0;
+}
 ########## Data Storage functions #########################
 
 sub put {
@@ -154,26 +174,118 @@ sub mk_cypher {
 
 sub enc_cmd {
 	my $func = shift;
-    my $post_func = shift;
 
 	my $filename = shift @ARGV;
 
 	defined $filename && -f $filename
 	or pod2usage(-verbose => 99, -sections=>["SYNOPSIS", "ARGUMENTS"]);
 
-	my $data = read_file($filename);
-
 	my $cypher = mk_cypher($term, $filename);
-	$data = &$func($cypher, $data);
-
-    if ($post_func) {
-        $data = &$post_func($data);
-    }
+	
+    $data = &$func($cypher, $filename);
 
 	binmode(STDOUT);
 	print $data;
 
 	exit(0);
+}
+
+sub encrypt_file {
+	my $cypher = shift;
+	my $filename = shift;
+	my $out_filename = shift || "-";
+
+	open(my $file, "<", $filename);
+	binmode($file);
+
+    my $outfile;
+    if ($out_filename eq "-") {
+        $outfile = *STDOUT;
+    } else {
+        open($outfile, ">", $out_filename);
+    }
+    binmode($outfile);
+	
+    my $version = pack('n', $ENCRYPTED_FILE_VER_1);
+
+    syswrite($outfile, $version);
+
+    my $pad_length = 0;
+    while($pad_length == 0) {
+        my $data = '';
+        my $bytes_read = sysread($file, $data, 4096); # read by 4k blocks
+        if (!defined $bytes_read) {
+            croak("can't read file $file: $!");
+        } elsif (!$bytes_read) {
+            last;
+        }
+        if (($bytes_read % 16) != 0) {
+            $pad_length = 16 - ($bytes_read % 16);
+        }
+        if ($pad_length != 0) {
+            my $pad = '~' x $pad_length;
+            $data .= $pad;
+        }
+
+        $data = $cypher->encrypt($data);
+        
+        syswrite($outfile, $data);
+    }
+	close($file);
+
+    syswrite($outfile, pack("C", $pad_length));
+    
+    if ($out_filename eq "-") {
+        close($out_filename);
+    }
+}
+
+sub decrypt_file {
+	my $cypher = shift;
+	my $filename = shift;
+	my $out_filename = shift || "-";
+
+	open(my $file, "<", $filename);
+	binmode($file);
+
+    my $outfile;
+    if ($out_filename eq "-") {
+        $outfile = *STDOUT;
+    } else {
+        open($outfile, ">", $out_filename);
+    }
+	
+    binmode($outfile);
+ 
+    my $version;
+    my $bytes_read = sysread($file, $version, 2);
+    ($version) = unpack('n', $version);
+    if (int($version) == $ENCRYPTED_FILE_VER_1) {
+        my $last_block = '';
+        $bytes_read = sysread($file, $last_block, 4096);
+        while($bytes_read == 4096) {
+            syswrite($outfile, $cypher->decrypt($last_block));
+            $last_block = '';
+            $bytes_read = sysread($file, $last_block, 4096);
+        }
+        # decrypt last block
+        if (($bytes_read - 1) % 16 != 0) {
+            croak("Unexpected end of file, bytes_read = $bytes_read");
+        }
+        my $pad_length = unpack('C', substr($last_block,-1));
+        
+        my $last_decrypted = $cypher->decrypt(substr($last_block, 0, -1));
+        if ($pad_length > 0) {
+		    $last_decrypted = substr($last_decrypted, 0, -1*$pad_length);
+        }
+        syswrite($outfile, $last_decrypted);
+    } else {
+        croak("Unknown file encryption format");
+    }
+    
+    if ($out_filename eq "-") {
+        close($out_filename);
+    }
 }
 
 sub encrypt {
@@ -308,7 +420,7 @@ sub load_data {
 		return {};
 	}
 
-	my $data = read_file($filename);
+	my $data = read_file($filename, { binmode => ':raw' });
 
 	$data = decrypt($cypher,$data);
 
@@ -322,50 +434,9 @@ sub store_data {
 
 	my $ice = encrypt($cypher,serialize($data));
 
-	write_file($ice,$filename);
+	write_file($filename, {binmode => ':raw'}, $ice);
 
 	return 1;
-}
-
-########### System I/O functions ##############################
-
-sub read_file {
-	my $filename = shift;
-
-	open(my $file, "<", $filename);
-	binmode($file);
-
-	my $fsize = -s $filename;
-	my $data = '';
-
-	my $bytes_read = sysread($file, $data, $fsize) || 0;
-
-	$bytes_read == $fsize
-	or croak("Can't load $file: $!");
-
-	close($file);
-
-	return $data;
-}
-
-sub write_file {
-	my $data = shift;
-	my $filename = shift || "-";
-
-    my $file;
-    if ($filename eq "-") {
-        $file = *STDOUT;
-    } else {
-        open($file, ">", $filename);
-    }
-	binmode($file);
-
-	syswrite($file, $data)
-	or croak("Write $file failed: $!");
-
-    if ($filename ne "-") {
-	    close($file);
-    }
 }
 
 ############# Auto completion ###############################
@@ -422,6 +493,8 @@ sub trim {
 	$s =~ s/^\s+|\s+$//g;
 	return $s;
 }
+
+1;
 
 =pod
 
