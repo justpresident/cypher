@@ -79,6 +79,7 @@ sub cypher {
             case "history" {get(1, @args)}
             case "put" { put(@args) }
             case "del" { del(@args)}
+            case "rm" { del(@args)}
             case "help" {help(@args)}
             else { say "No such command '$cmd'\n" }
         }
@@ -88,6 +89,15 @@ sub cypher {
     exit 0;
 }
 ########## Data Storage functions #########################
+
+sub help {
+    pod2usage(
+        -verbose => 99,
+        -exitval => "NOEXIT",
+        -sections => ["USER COMMANDS", "STORAGE MODE FEATURES"],
+        -noperldoc => 1,
+    );
+}
 
 sub put {
     my $key = shift;
@@ -456,7 +466,7 @@ sub autocomplete {
     #	print "ac: $text,$line\t$cmd,'".scalar(@args)."'\n";
 
     if (@args) {
-        if ($cmd =~ /^(search|get|history|del|put)$/) {
+        if ($cmd =~ /^(search|get|history|del|rm|put|help)$/) {
             return undef if @args > 1;
             return $term->completion_matches($text,\&keyword);
         }
@@ -540,41 +550,41 @@ Following commands available in Secure Storage Mode:
 
 =over
 
-=item * put KEY VAL
+=item put KEY VAL
 
-Puts pair KEY:VAL into storage
-
-=back
-
-=over
-
-=item * get REGEXP
-
-Dumps all data for keys matching perl regexp /^REGEXP\$/
+Puts a pair KEY:VAL into storage
 
 =back
 
 =over
 
-=item * history KEY
+=item get REGEXP
 
-Dumps history of changes of KEY
-
-=back
-
-=over
-
-=item * search MASK
-
-Searches and shows all keys, containing MASK as substring
+Dumps all the data for keys matching perl regexp /^REGEXP\$/
 
 =back
 
 =over
 
-=item * del KEY
+=item history KEY
 
-Deletes key KEY from storage
+Dumps history of changes of the given KEY
+
+=back
+
+=over
+
+=item search REGEXP
+
+Searches and shows all the keys, matching the provided REGEXP
+
+=back
+
+=over
+
+=item del|rm KEY
+
+Deletes key KEY from storage.
 
 =back
 
